@@ -1,1 +1,111 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>Solicitação de Serviços – Grupo Four</title>
 
+  <!-- 
+    Viewport para layout responsivo em celulares 
+    e fontes do sistema para performance.
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Arquivo de estilos da página -->
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!-- Barra superior simples com o título do formulário -->
+  <header class="topbar">
+    <h1>Solicitação de Serviços – Grupo Four</h1>
+  </header>
+
+  <main class="container">
+    <!--
+      CARD 1: Dados do cliente
+      - Campos básicos + CHAVE DE ACESSO digitada pelo cliente
+      - A chave será enviada no JSON como "accessKey"
+    -->
+    <section class="card" aria-labelledby="titulo-dados">
+      <h2 id="titulo-dados">Dados do cliente</h2>
+
+      <div class="grid">
+        <label>Nome
+          <input type="text" id="nome" autocomplete="name" required
+                 placeholder="Seu nome completo" />
+        </label>
+
+        <label>E‑mail
+          <!-- type=email dá uma validação básica de formato -->
+          <input type="email" id="email" autocomplete="email" required
+                 placeholder="nome@empresa.com" />
+        </label>
+
+        <label>Empresa
+          <input type="text" id="empresa" autocomplete="organization"
+                 placeholder="(opcional)" />
+        </label>
+
+        <label>Chave de acesso
+          <!-- Campo de chave: o cliente digitará a chave que você forneceu -->
+          <input type="password" id="accessKey" required
+                 placeholder="Informe a chave fornecida pela Four" />
+        </label>
+      </div>
+
+      <!-- Mensagens de orientação da seção -->
+      <p class="muted">
+        Dica: você receberá uma confirmação por e‑mail após o envio.
+      </p>
+    </section>
+
+    <!--
+      CARD 2: Lista de serviços
+      - A lista é carregada dinamicamente do arquivo services.json
+      - Cada serviço vira um "card" com:
+          • checkbox (selecionar serviço)
+          • descrição
+          • horas (badge)
+          • select de cargo (Júnior/Pleno/Sênior) com valores
+    -->
+    <section class="card" aria-labelledby="titulo-servicos">
+      <h2 id="titulo-servicos">Selecione os serviços</h2>
+
+      <p class="muted">
+        Marque um ou mais serviços e escolha o cargo desejado.
+        Os valores exibidos são meramente informativos (não há cálculo de total).
+      </p>
+
+      <!-- Aqui o JS injetará os cards de serviços -->
+      <div id="servicos" class="servicos" role="group" aria-label="Lista de serviços"></div>
+    </section>
+
+    <!--
+      Ações (rodapé do formulário)
+      - Botão Enviar aciona a coleta e o POST para o Apps Script
+      - Área de status para feedback ao usuário
+    -->
+    <section class="actions" aria-label="Ações do formulário">
+      <button id="btnEnviar" class="btnPrimary" type="button">
+        Enviar solicitação
+      </button>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <small>© Grupo Four</small>
+  </footer>
+
+  <!-- 
+    URL da sua API (Apps Script) – 
+    é a URL /exec que você me passou. 
+    Mantemos separado para ficar fácil de localizar/trocar se necessário.
+  -->
+  <script>
+    window.API_URL = "https://script.google.com/macros/s/AKfycbwBvRp-oCUJH-KaH0VlWoSKRvtnLQSUsSIXIikyQAh7o8NKwzKRj--iBCQ-QNFZxXfe5A/exec";
+  </script>
+
+  <!-- Arquivo JS com toda a lógica do front-end -->
+  <script src="./script.js"></script>
+</body>
+</html>
