@@ -1,6 +1,6 @@
 /**
  * Front-end do mini-site (completo e comentado)
- * - Suporte a múltiplos cargos por serviço (chips/pílulas)
+ * - Múltiplos cargos por serviço (chips/pílulas)
  * - Validações:
  *    • Nome, E-mail, Chave de acesso
  *    • Pelo menos 1 serviço selecionado
@@ -29,41 +29,25 @@ async function loadServices() {
 
 /* ========== Card de serviço com múltiplos cargos (chips) ========== */
 function createServiceCard(svc) {
-  // Checkbox master do serviço
   const serviceCB = el('input', { type: 'checkbox', 'aria-label': `Selecionar ${svc.servico}` });
-
-  // 3 checkboxes de cargo (ocultos visualmente; estilizados via .cargoOption)
   const cbJunior = el('input', { type: 'checkbox', disabled: true });
   const cbPleno  = el('input', { type: 'checkbox', disabled: true });
   const cbSenior = el('input', { type: 'checkbox', disabled: true });
 
-  // Habilita/desabilita cargos quando o serviço é marcado
   serviceCB.addEventListener('change', () => {
     const on = serviceCB.checked;
     [cbJunior, cbPleno, cbSenior].forEach(cb => {
       cb.disabled = !on;
-      if (!on) cb.checked = false; // limpamos ao desmarcar o serviço
+      if (!on) cb.checked = false;
     });
   });
 
-  // Grupo de cargos (em coluna)
   const cargosGroup = el('div', { class: 'row cargo-group' },
-    // Cada cargo é um <label> que envolve o <input> oculto + <span> com o texto
-    el('label', { class: 'cargoOption' },
-      cbJunior,
-      el('span', {}, `Júnior — R$ ${svc.junior ?? 0}`)
-    ),
-    el('label', { class: 'cargoOption' },
-      cbPleno,
-      el('span', {}, `Pleno — R$ ${svc.pleno ?? 0}`)
-    ),
-    el('label', { class: 'cargoOption' },
-      cbSenior,
-      el('span', {}, `Sênior — R$ ${svc.senior ?? 0}`)
-    )
+    el('label', { class: 'cargoOption' }, cbJunior, el('span', {}, `Júnior — R$ ${svc.junior ?? 0}`)),
+    el('label', { class: 'cargoOption' }, cbPleno,  el('span', {}, `Pleno — R$ ${svc.pleno ?? 0}`)),
+    el('label', { class: 'cargoOption' }, cbSenior, el('span', {}, `Sênior — R$ ${svc.senior ?? 0}`))
   );
 
-  // Card visual do serviço
   const card = el('div', { class: 'servico' },
     el('div', { class: 'row' },
       serviceCB,
@@ -74,7 +58,6 @@ function createServiceCard(svc) {
     cargosGroup
   );
 
-  // Guardamos referências úteis
   card._meta = { svc, serviceCB, cbJunior, cbPleno, cbSenior, cargosGroup };
   return card;
 }
@@ -116,7 +99,6 @@ async function onSubmit() {
   cards.forEach(card => {
     const { svc, serviceCB, cbJunior, cbPleno, cbSenior } = card._meta;
 
-    // remover destaque de erro, se houver
     card.style.outline = '';
 
     if (serviceCB.checked) {
@@ -127,7 +109,7 @@ async function onSubmit() {
 
       if (cargosSelecionados.length === 0) {
         erroMsg = `Selecione pelo menos um cargo para o serviço: "${svc.servico}".`;
-        card.style.outline = '2px solid #ef4444'; // realce visual
+        card.style.outline = '2px solid #ef4444';
       } else {
         cargosSelecionados.forEach(cargo => {
           itens.push({
@@ -156,7 +138,7 @@ async function onSubmit() {
   const payload = { accessKey, nome, email, empresa, itens };
 
   try {
-    // Enviamos como text/plain (simple request) para evitar preflight/CORS
+    // text/plain evita preflight/CORS
     const resp = await fetch(window.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -175,13 +157,11 @@ async function onSubmit() {
     }
 
     status.textContent = 'Enviado com sucesso! Você receberá um e‑mail com o resumo.';
-
   } catch (err) {
     status.textContent = 'Falha de rede. Verifique sua conexão e tente novamente.';
   }
 }
 
-// Inicializa
 init().catch(err => {
   const status = document.getElementById('status');
   status.textContent = 'Erro ao iniciar: ' + (err?.message || String(err));
