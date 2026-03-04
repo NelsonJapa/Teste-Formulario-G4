@@ -1,23 +1,25 @@
 /**
  * Front-end do mini-site (completo e comentado)
+ * Suporte a múltiplos cargos por serviço.
  * 
  * Responsabilidades:
  *  - Carregar a lista de serviços (services.json)
- *  - Gerar os "cards" de serviços (checkbox + horas + descrição + select de cargo)
- *  - Validar campos básicos (nome, e-mail, chave e pelo menos 1 serviço)
- *  - Montar o payload do POST (inclui accessKey)
- *  - Enviar para a API (Apps Script) e exibir status para o usuário
- * 
- * Observações:
- *  - NÃO armazenamos a chave no código; o cliente DIGITA no input.
- *  - A API valida a chave via array API_KEYS no Apps Script (servidor).
+ *  - Gerar "cards" de serviços:
+ *      • checkbox principal (selecionar serviço)
+ *      • badge de horas
+ *      • descrição
+ *      • checkboxes de cargo (Júnior/Pleno/Sênior) com valores informativos
+ *  - Validar:
+ *      • Nome, E-mail, Chave de acesso
+ *      • Pelo menos 1 serviço selecionado
+ *      • Para cada serviço marcado, pelo menos 1 cargo marcado
+ *  - Montar o payload:
+ *      • Um item por (serviço, cargo) selecionado
+ *  - Enviar para a API (Apps Script) usando Content-Type text/plain (evita preflight/CORS)
+ *  - Exibir feedback (status) ao usuário
  */
 
-/* ========== Utilitários DOM ========== */
-
-/**
- * Cria elemento DOM de forma simples (tag, atributos, filhos).
- */
+/* ========== Utilitário simples para criar elementos DOM ========== */
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   Object.entries(attrs).forEach(([k, v]) => {
@@ -29,92 +31,84 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-/* ========== Carregamento de serviços (JSON) ========== */
-
-/**
- * Busca o catálogo de serviços.
- * - O arquivo services.json deve estar na raiz do repositório/publicação.
- */
+/* ========== Carregamento do catálogo de serviços (JSON) ========== */
 async function loadServices() {
   const res = await fetch('./services.json', { cache: 'no-store' });
-  if (!res.ok) {
-    throw new Error('Não foi possível carregar o catálogo de serviços (services.json).');
-  }
+  if (!res.ok) throw new Error('Não foi possível carregar o catálogo de serviços (services.json).');
   return res.json();
 }
 
-/* ========== Geração dos cards de serviço ========== */
-
-/**
- * Cria um "card" de serviço com:
- *  - checkbox (selecionar/desmarcar)
- *  - badge de horas
- *  - descrição (texto)
- *  - select de cargo (Júnior/Pleno/Sênior) com valores informativos
- */
+/* ========== Criação do card de serviço (com múltiplos cargos) ========== */
 function createServiceCard(svc) {
-  // Checkbox que liga/desliga o card (habilita selecionar cargo)
-  const checkbox = el('input', { type: 'checkbox', 'aria-label': `Selecionar ${svc.servico}` });
+  // Checkbox mestre (liga/desliga o serviço)
+  const serviceCB = el('input', { type: 'checkbox', 'aria-label': `Selecionar ${svc.servico}` });
 
-  // Select de cargo com valores informativos por opção
-  const cargoSel = el('select', { class: 'cargo', disabled: true },
-    el('option', { value: '' }, 'Selecione o cargo'),
-    el('option', { value: 'Junior' }, `Júnior — R$ ${svc.junior ?? 0}`),
-    el('option', { value: 'Pleno' },  `Pleno — R$ ${svc.pleno ?? 0}`),
-    el('option', { value: 'Senior' }, `Sênior — R$ ${svc.senior ?? 0}`)
-  );
+  // 3 checkboxes de cargo (o cliente pode marcar mais de um)
+  const cbJunior = el('input', { type: 'checkbox', disabled: true });
+  const cbPleno  = el('input', { type: 'checkbox', disabled: true });
+  const cbSenior = el('input', { type: 'checkbox', disabled: true });
 
-  // Ao marcar o serviço, habilita a escolha de cargo
-  checkbox.addEventListener('change', () => {
-    cargoSel.disabled = !checkbox.checked;
+  // Habilita/desabilita os cargos quando o serviço é marcado/desmarcado
+  serviceCB.addEventListener('change', () => {
+    const on = serviceCB.checked;
+    [cbJunior, cbPleno, cbSenior].forEach(cb => {
+      cb.disabled = !on;
+      if (!on) cb.checked = false; // limpamos se desmarcar o serviço
+    });
   });
 
-  // Monta a estrutura visual do card
+  // Grupo visual dos cargos
+  const cargosGroup = el('div', { class: 'row cargo-group' },
+    // Júnior
+    el('label', { class: 'cargoOption' },
+      cbJunior,
+      el('span', {}, `Júnior — R$ ${svc.junior ?? 0}`)
+    ),
+    // Pleno
+    el('label', { class: 'cargoOption' },
+      cbPleno,
+      el('span', {}, `Pleno — R$ ${svc.pleno ?? 0}`)
+    ),
+    // Sênior
+    el('label', { class: 'cargoOption' },
+      cbSenior,
+      el('span', {}, `Sênior — R$ ${svc.senior ?? 0}`)
+    )
+  );
+
+  // Monta o card visual
   const card = el('div', { class: 'servico' },
     el('div', { class: 'row' },
-      checkbox,
+      serviceCB,
       el('h3', {}, svc.servico),
       el('span', { class: 'badge' }, `${svc.horas} h`)
     ),
     el('div', { class: 'desc' }, svc.descricao || ''),
-    el('div', { class: 'row' },
-      el('label', {}, 'Cargo', cargoSel)
-    )
+    cargosGroup
   );
 
-  // Guardamos referências úteis no próprio elemento para leitura posterior
-  card._meta = { svc, checkbox, cargoSel };
+  // Guardar refs úteis para leitura no envio
+  card._meta = { svc, serviceCB, cbJunior, cbPleno, cbSenior, cargosGroup };
   return card;
 }
 
-/* ========== Inicialização da página ========== */
-
+/* ========== Inicialização ========== */
 async function init() {
   const container = document.getElementById('servicos');
   const status = document.getElementById('status');
 
   try {
-    // 1) Carrega o catálogo e desenha os cards
     const services = await loadServices();
     services.forEach(s => container.appendChild(createServiceCard(s)));
   } catch (err) {
     status.textContent = err.message || 'Erro ao carregar serviços.';
-    return; // Interrompe inicialização em caso de falha de catálogo
+    return;
   }
 
-  // 2) Envio do formulário
   document.getElementById('btnEnviar').addEventListener('click', onSubmit);
 }
 
-/* ========== Validação dos campos e submissão ========== */
-
-/**
- * Lida com o clique em "Enviar solicitação":
- *  - Valida Nome/E-mail/Chave
- *  - Coleta os serviços marcados e cargos
- *  - Dispara POST para a API
- *  - Mostra feedback de sucesso/erro
- */
+/* ========== Envio (validação + POST) ========== */
 async function onSubmit() {
   const status = document.getElementById('status');
   status.textContent = 'Enviando...';
@@ -125,68 +119,84 @@ async function onSubmit() {
   const empresa = document.getElementById('empresa').value.trim();
   const accessKey = document.getElementById('accessKey').value.trim();
 
-  // Validações simples no front (o backend também valida)
-  if (!nome)  { status.textContent = 'Informe seu nome.'; return; }
-  if (!email) { status.textContent = 'Informe seu e‑mail.'; return; }
+  // Validações simples do cabeçalho
+  if (!nome)      { status.textContent = 'Informe seu nome.'; return; }
+  if (!email)     { status.textContent = 'Informe seu e‑mail.'; return; }
   if (!accessKey) { status.textContent = 'Informe a chave de acesso.'; return; }
 
-  // Coleta itens selecionados
+  // Coleta dos serviços marcados e exige pelo menos 1 cargo por serviço
   const cards = Array.from(document.querySelectorAll('.servico'));
   const itens = [];
-  cards.forEach(c => {
-    const { svc, checkbox, cargoSel } = c._meta;
-    if (checkbox.checked) {
-      itens.push({
-        servico: svc.servico,
-        cargo: cargoSel.value || '',
-        horas: svc.horas,
-        valor: cargoSel.value === 'Junior' ? svc.junior
-             : cargoSel.value === 'Pleno'  ? svc.pleno
-             : cargoSel.value === 'Senior' ? svc.senior : 0,
-        descricao: svc.descricao
-      });
+  let erroMsg = null;
+
+  cards.forEach(card => {
+    const { svc, serviceCB, cbJunior, cbPleno, cbSenior, cargosGroup } = card._meta;
+
+    // limpar destaque de erro, se houver
+    card.style.outline = '';
+
+    if (serviceCB.checked) {
+      const cargosSelecionados = [];
+      if (cbJunior.checked) cargosSelecionados.push('Junior');
+      if (cbPleno.checked)  cargosSelecionados.push('Pleno');
+      if (cbSenior.checked) cargosSelecionados.push('Senior');
+
+      if (cargosSelecionados.length === 0) {
+        // se o serviço foi marcado mas nenhum cargo foi escolhido, erro
+        erroMsg = `Selecione pelo menos um cargo para o serviço: "${svc.servico}".`;
+        card.style.outline = '2px solid #ef4444'; // realce visual opcional
+      } else {
+        // para cada cargo marcado, criamos UM item (linha) no payload
+        cargosSelecionados.forEach(cargo => {
+          itens.push({
+            servico: svc.servico,
+            cargo,
+            horas: svc.horas,
+            valor: cargo === 'Junior' ? svc.junior
+                 : cargo === 'Pleno'  ? svc.pleno
+                 : cargo === 'Senior' ? svc.senior : 0,
+            descricao: svc.descricao
+          });
+        });
+      }
     }
   });
 
-  if (itens.length === 0) {
-    status.textContent = 'Selecione pelo menos um serviço.';
+  // Pelo menos um serviço?
+  if (!itens.length && !erroMsg) {
+    status.textContent = 'Selecione pelo menos um serviço e cargo.';
+    return;
+  }
+  if (erroMsg) {
+    status.textContent = erroMsg;
     return;
   }
 
-  // Monta o payload para a API
-  const payload = {
-    accessKey,  // ✅ chave que será validada no Apps Script
-    nome, email, empresa,
-    itens
-  };
+  // Monta payload para o backend
+  const payload = { accessKey, nome, email, empresa, itens };
 
   try {
-    // Envio via fetch para a URL do Apps Script configurada em index.html
+    // Enviamos como text/plain (simple request) para evitar preflight/CORS
     const resp = await fetch(window.API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
     });
 
-    // Tentamos ler JSON de retorno (status: OK/ERR)
     const data = await resp.json().catch(() => ({}));
 
+    if (resp.status === 401) {
+      status.textContent = 'Chave de acesso inválida. Verifique e tente novamente.';
+      return;
+    }
+
     if (!resp.ok || data.status !== 'OK') {
-      // Mensagem de erro do servidor, se disponível
       const msg = data.message || `Erro HTTP ${resp.status}`;
       status.textContent = `Falha ao enviar: ${msg}`;
       return;
     }
 
-    // Sucesso!
     status.textContent = 'Enviado com sucesso! Você receberá um e‑mail com o resumo.';
-    // Opcional: limpar seleções após enviar
-    // document.getElementById('nome').value = '';
-    // document.getElementById('email').value = '';
-    // document.getElementById('empresa').value = '';
-    // document.getElementById('accessKey').value = '';
-    // document.querySelectorAll('.servico input[type="checkbox"]').forEach(cb => cb.checked = false);
-    // document.querySelectorAll('.servico select.cargo').forEach(sel => { sel.selectedIndex = 0; sel.disabled = true; });
 
   } catch (err) {
     status.textContent = 'Falha de rede. Verifique sua conexão e tente novamente.';
